@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Meta de seguidores</title>
+<style>
+  :root { --c1: #ff2d78; --c2: #00e5ff; }
+  html, body {
+    margin: 0;
+    background: transparent;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+  }
+  .card {
+    position: relative;
+    width: 640px;
+    margin: 20px;
+    padding: 16px 22px 18px;
+    border-radius: 22px;
+    background: rgba(15, 15, 25, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .title { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+  .count { font-size: 34px; font-weight: 800; }
+  .count small { font-size: 20px; opacity: 0.7; font-weight: 600; }
+  .bar {
+    height: 26px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+  }
+  .fill {
+    position: relative;
+    height: 100%;
+    width: 0;
+    border-radius: 14px;
+    background: linear-gradient(90deg, var(--c1), var(--c2));
+    box-shadow: 0 0 18px var(--c1);
+    transition: width 0.9s cubic-bezier(0.2, 0.9, 0.2, 1);
+    overflow: hidden;
+  }
+  .fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: shine 2.6s infinite;
+  }
+  @keyframes shine { to { transform: translateX(100%); } }
+  .pop { animation: pop 0.5s; }
+  @keyframes pop { 30% { transform: scale(1.25); } 100% { transform: scale(1); } }
+  .toast {
+    height: 22px;
+    margin-top: 10px;
+    font-size: 16px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.4s, transform 0.4s;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .done .fill { animation: glow 1.2s infinite alternate; }
+  @keyframes glow { to { box-shadow: 0 0 34px var(--c2); } }
+  #dot {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #888;
+  }
+  #dot.on { background: #2ee66b; }
+  #dot.warn { background: #ffb02e; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div id="dot"></div>
+  <div class="top">
+    <div class="title" id="title">Meta de seguidores</div>
+    <div class="count"><span id="num">0</span> <small>/ <span id="goal">0</span></small></div>
+  </div>
+  <div class="bar"><div class="fill" id="fill"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+  // ---- Configuración por la URL ----
+  // Ejemplo: /overlay?inicio=94&meta=100&paso=50&titulo=Meta%20de%20seguidores
+  const p = new URLSearchParams(location.search);
+  const inicio = parseInt(p.get('inicio') || '94', 10);
+  let meta = parseInt(p.get('meta') || '100', 10);
+  const paso = parseInt(p.get('paso') || '0', 10); // si lo pones, la meta sube sola al cumplirse
+  const titulo = p.get('titulo') || 'Meta de seguidores';
+  if (p.get('c1')) document.documentElement.style.setProperty('--c1', '#' + p.get('c1'));
+  if (p.get('c2')) document.documentElement.style.setProperty('--c2', '#' + p.get('c2'));
+  if (p.get('debug')) document.getElementById('dot').style.display = 'block';
+
+  const el = {
+    card: document.getElementById('card'),
+    title: document.getElementById('title'),
+    num: document.getElementById('num'),
+    goal: document.getElementById('goal'),
+    fill: document.getElementById('fill'),
+    toast: document.getElementById('toast'),
+    dot: document.getElementById('dot'),
+  };
+  el.title.textContent = titulo;
+
+  // ---- Contador (se guarda en el navegador por si se recarga la página) ----
+  const key = 'cnt_' + inicio;
+  let count = inicio;
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved !== null && !isNaN(parseInt(saved, 10))) count = parseInt(saved, 10);
+  } catch (e) {}
+
+  function render(animate) {
+    while (paso > 0 && count >= meta) meta += paso;
+    el.num.textContent = count;
+    el.goal.textContent = meta;
+    el.fill.style.width = Math.min(100, (count / meta) * 100) + '%';
+    el.card.classList.toggle('done', count >= meta);
+    if (animate) {
+      el.num.classList.remove('pop');
+      void el.num.offsetWidth;
+      el.num.classList.add('pop');
+    }
+  }
+
+  let toastTimer = null;
+  function showToast(text) {
+    el.toast.textContent = text;
+    el.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.remove('show'), 4000);
+  }
+
+  function onFollow(user) {
+    count += 1;
+    try { localStorage.setItem(key, String(count)); } catch (e) {}
+    render(true);
+    showToast('💖 ' + (user ? '@' + user + ' ' : '') + 'te ha seguido');
+  }
+
+  // ---- Conexión con el servidor ----
+  let ws = null;
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    ws = new WebSocket(proto + location.host + '/ws');
+    ws.onopen = () => el.dot.className = 'warn';
+    ws.onmessage = (e) => {
+      let m;
+      try { m = JSON.parse(e.data); } catch (_) { return; } // ignora "pong"
+      if (m.type === 'follow') onFollow(m.user);
+      if (m.type === 'status') el.dot.className = m.status === 'live' ? 'on' : 'warn';
+    };
+    ws.onclose = () => { el.dot.className = ''; setTimeout(connect, 3000); };
+    ws.onerror = () => { try { ws.close(); } catch (_) {} };
+  }
+  // Latido cada 45 s: mantiene despierto el servicio gratuito mientras el overlay está abierto
+  setInterval(() => { if (ws && ws.readyState === 1) ws.send('ping'); }, 45000);
+
+  render(false);
+  connect();
+</script>
+</body>
+</html>

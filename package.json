@@ -1,0 +1,17 @@
+{
+  "name": "overlay-seguidores",
+  "version": "1.0.0",
+  "description": "Overlay de meta de seguidores en tiempo real para TikTok Live",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "tiktok-live-connector": "latest",
+    "ws": "^8.18.0"
+  }
+}

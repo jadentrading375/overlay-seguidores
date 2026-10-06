@@ -4,7 +4,11 @@
 <meta charset="utf-8">
 <title>Meta de seguidores</title>
 <style>
-  :root { --c1: #ff2d78; --c2: #00e5ff; }
+  :root { 
+    --c1: #ff2d78; /* Color principal (rosa TikTok) */
+    --c2: #00e5ff; /* Color secundario (azul TikTok) */
+    --bg: rgba(15, 15, 25, 0.85);
+  }
   html, body {
     margin: 0;
     background: transparent;
@@ -12,29 +16,47 @@
     color: #fff;
     overflow: hidden;
   }
+  /* Animación de flotación suave para toda la tarjeta */
   .card {
     position: relative;
     width: 640px;
     margin: 20px;
-    padding: 16px 22px 18px;
-    border-radius: 22px;
-    background: rgba(15, 15, 25, 0.72);
+    padding: 18px 24px 20px;
+    border-radius: 24px;
+    background: var(--bg);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    animation: float 6s ease-in-out infinite;
+  }
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0px); }
   }
   .top {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
-  .title { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
-  .count { font-size: 34px; font-weight: 800; }
-  .count small { font-size: 20px; opacity: 0.7; font-weight: 600; }
+  /* Tu nombre destacado */
+  .title { 
+    font-size: 24px; 
+    font-weight: 800; 
+    letter-spacing: 0.5px; 
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--c1), var(--c2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .count { font-size: 36px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+  .count small { font-size: 22px; opacity: 0.8; font-weight: 600; }
   .bar {
-    height: 26px;
+    height: 28px;
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
     overflow: hidden;
   }
   .fill {
@@ -43,51 +65,67 @@
     width: 0;
     border-radius: 14px;
     background: linear-gradient(90deg, var(--c1), var(--c2));
-    box-shadow: 0 0 18px var(--c1);
-    transition: width 0.9s cubic-bezier(0.2, 0.9, 0.2, 1);
+    box-shadow: 0 0 15px var(--c1);
+    transition: width 1s cubic-bezier(0.2, 0.9, 0.2, 1);
     overflow: hidden;
   }
   .fill::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.6) 50%, transparent 70%);
     transform: translateX(-100%);
-    animation: shine 2.6s infinite;
+    animation: shine 2s infinite;
   }
   @keyframes shine { to { transform: translateX(100%); } }
-  .pop { animation: pop 0.5s; }
-  @keyframes pop { 30% { transform: scale(1.25); } 100% { transform: scale(1); } }
+  
+  /* Animación al ganar un seguidor */
+  .pop { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+  @keyframes pop { 
+    0% { transform: scale(1); } 
+    50% { transform: scale(1.3); color: var(--c2); } 
+    100% { transform: scale(1); } 
+  }
+  
+  /* Animación al llegar a la meta */
+  .goal-reached { animation: pulseGoal 1s ease-out; }
+  @keyframes pulseGoal {
+    0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.7); }
+    70% { box-shadow: 0 0 0 30px rgba(0, 229, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); }
+  }
+
   .toast {
-    height: 22px;
-    margin-top: 10px;
-    font-size: 16px;
+    height: 24px;
+    margin-top: 12px;
+    font-size: 17px;
+    font-weight: 600;
     opacity: 0;
-    transform: translateY(6px);
-    transition: opacity 0.4s, transform 0.4s;
+    transform: translateY(10px);
+    transition: all 0.4s ease;
+    color: #e0e0e0;
   }
   .toast.show { opacity: 1; transform: translateY(0); }
-  .done .fill { animation: glow 1.2s infinite alternate; }
-  @keyframes glow { to { box-shadow: 0 0 34px var(--c2); } }
   #dot {
     display: none;
     position: absolute;
-    top: 10px;
-    right: 12px;
-    width: 10px;
-    height: 10px;
+    top: 12px;
+    right: 16px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: #888;
+    box-shadow: 0 0 8px #888;
   }
-  #dot.on { background: #2ee66b; }
-  #dot.warn { background: #ffb02e; }
+  #dot.on { background: #2ee66b; box-shadow: 0 0 12px #2ee66b; }
+  #dot.warn { background: #ffb02e; box-shadow: 0 0 12px #ffb02e; }
 </style>
 </head>
 <body>
 <div class="card" id="card">
   <div id="dot"></div>
   <div class="top">
-    <div class="title" id="title">Meta de seguidores</div>
+    <div class="title" id="title">🎮 JaadeenV</div>
     <div class="count"><span id="num">0</span> <small>/ <span id="goal">0</span></small></div>
   </div>
   <div class="bar"><div class="fill" id="fill"></div></div>
@@ -95,46 +133,66 @@
 </div>
 
 <script>
-  // ---- Configuración por la URL ----
-  // Ejemplo: /overlay?inicio=94&meta=100&paso=50&titulo=Meta%20de%20seguidores
+  // ---- Configuración ----
   const p = new URLSearchParams(location.search);
-  const inicio = parseInt(p.get('inicio') || '94', 10);
-  let meta = parseInt(p.get('meta') || '100', 10);
-  const paso = parseInt(p.get('paso') || '0', 10); // si lo pones, la meta sube sola al cumplirse
-  const titulo = p.get('titulo') || 'Meta de seguidores';
-  if (p.get('c1')) document.documentElement.style.setProperty('--c1', '#' + p.get('c1'));
-  if (p.get('c2')) document.documentElement.style.setProperty('--c2', '#' + p.get('c2'));
-  if (p.get('debug')) document.getElementById('dot').style.display = 'block';
+  // Paso de la meta (por defecto cada 50 seguidores: 50, 100, 150...)
+  const paso = parseInt(p.get('paso') || '50', 10); 
+  // Forzar un total inicial desde la URL si es necesario
+  const inicioURL = p.get('total'); 
 
   const el = {
     card: document.getElementById('card'),
-    title: document.getElementById('title'),
     num: document.getElementById('num'),
     goal: document.getElementById('goal'),
     fill: document.getElementById('fill'),
     toast: document.getElementById('toast'),
     dot: document.getElementById('dot'),
   };
-  el.title.textContent = titulo;
 
-  // ---- Contador (se guarda en el navegador por si se recarga la página) ----
-  const key = 'cnt_' + inicio;
-  let count = inicio;
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved !== null && !isNaN(parseInt(saved, 10))) count = parseInt(saved, 10);
-  } catch (e) {}
+  // ---- Sistema de guardado del total real ----
+  let totalSeguidores = 0;
+  
+  // Si pones ?total=120 en la URL, fuerza ese número. Si no, lee el guardado.
+  if (inicioURL !== null && !isNaN(parseInt(inicioURL, 10))) {
+    totalSeguidores = parseInt(inicioURL, 10);
+    localStorage.setItem('jaadeen_total', totalSeguidores);
+  } else {
+    const saved = localStorage.getItem('jaadeen_total');
+    if (saved !== null) totalSeguidores = parseInt(saved, 10);
+  }
 
-  function render(animate) {
-    while (paso > 0 && count >= meta) meta += paso;
-    el.num.textContent = count;
+  // Calcula automáticamente la siguiente meta
+  function calcularSiguienteMeta(actual, salto) {
+    if (actual === 0) return salto;
+    const resto = actual % salto;
+    if (resto === 0) return actual + salto; // Si estás justo en 100, la meta es 150
+    return actual + (salto - resto);
+  }
+
+  function render(animateFollow, animateGoal) {
+    const meta = calcularSiguienteMeta(totalSeguidores, paso);
+    const metaAnterior = meta - paso;
+    
+    // Progreso dentro de la meta actual (ej: de 100 a 150)
+    const progreso = totalSeguidores - metaAnterior;
+    let porcentaje = (progreso / paso) * 100;
+    if (porcentaje > 100) porcentaje = 100;
+
+    el.num.textContent = totalSeguidores;
     el.goal.textContent = meta;
-    el.fill.style.width = Math.min(100, (count / meta) * 100) + '%';
-    el.card.classList.toggle('done', count >= meta);
-    if (animate) {
+    el.fill.style.width = porcentaje + '%';
+
+    if (animateFollow) {
       el.num.classList.remove('pop');
-      void el.num.offsetWidth;
+      void el.num.offsetWidth; // Refresca la animación
       el.num.classList.add('pop');
+    }
+
+    if (animateGoal) {
+      el.card.classList.remove('goal-reached');
+      void el.card.offsetWidth;
+      el.card.classList.add('goal-reached');
+      showToast('🎉 ¡META ALCANZADA! 🎉');
     }
   }
 
@@ -147,13 +205,21 @@
   }
 
   function onFollow(user) {
-    count += 1;
-    try { localStorage.setItem(key, String(count)); } catch (e) {}
-    render(true);
-    showToast('💖 ' + (user ? '@' + user + ' ' : '') + 'te ha seguido');
+    const metaAntes = calcularSiguienteMeta(totalSeguidores, paso);
+    
+    totalSeguidores += 1;
+    localStorage.setItem('jaadeen_total', String(totalSeguidores)); 
+    
+    const metaDespues = calcularSiguienteMeta(totalSeguidores, paso);
+    const alcanzoMeta = (metaDespues > metaAntes); // Si la meta subió, es que la completamos
+
+    render(true, alcanzoMeta);
+    if (!alcanzoMeta) {
+        showToast('💖 ' + (user ? '@' + user + ' ' : '') + 'te ha seguido');
+    }
   }
 
-  // ---- Conexión con el servidor ----
+  // ---- Conexión con tu servidor (Render) ----
   let ws = null;
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -161,17 +227,17 @@
     ws.onopen = () => el.dot.className = 'warn';
     ws.onmessage = (e) => {
       let m;
-      try { m = JSON.parse(e.data); } catch (_) { return; } // ignora "pong"
+      try { m = JSON.parse(e.data); } catch (_) { return; }
       if (m.type === 'follow') onFollow(m.user);
       if (m.type === 'status') el.dot.className = m.status === 'live' ? 'on' : 'warn';
     };
     ws.onclose = () => { el.dot.className = ''; setTimeout(connect, 3000); };
     ws.onerror = () => { try { ws.close(); } catch (_) {} };
   }
-  // Latido cada 45 s: mantiene despierto el servicio gratuito mientras el overlay está abierto
+  
   setInterval(() => { if (ws && ws.readyState === 1) ws.send('ping'); }, 45000);
 
-  render(false);
+  render(false, false);
   connect();
 </script>
 </body>

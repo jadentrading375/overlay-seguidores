@@ -1,112 +1,244 @@
-// Servidor del overlay de seguidores para TikTok Live
-// Escucha tu live con TikTok-Live-Connector y avisa al overlay cuando alguien te sigue.
-
-const express = require('express');
-const http = require('http');
-const path = require('path');
-const { WebSocketServer } = require('ws');
-const lib = require('tiktok-live-connector');
-
-// Compatible con la versión 1.x (WebcastPushConnection) y 2.x (TikTokLiveConnection)
-const Connection = lib.TikTokLiveConnection || lib.WebcastPushConnection;
-
-const TIKTOK_USER = (process.env.TIKTOK_USER || 'jaadennnnn').replace('@', '');
-const PORT = process.env.PORT || 3000;
-const RETRY_MS = 20000; // cada cuánto reintenta conectarse si no estás en directo
-
-// ---------- Servidor web ----------
-const app = express();
-app.get('/', (req, res) => res.redirect('/overlay'));
-app.get('/overlay', (req, res) => res.sendFile(path.join(__dirname, 'overlay.html')));
-app.get('/health', (req, res) => res.json({ ok: true, user: TIKTOK_USER, status }));
-
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
-
-let status = 'offline';
-const seen = new Set(); // evita contar dos veces al mismo usuario durante la sesión
-
-function broadcast(obj) {
-  const msg = JSON.stringify(obj);
-  for (const client of wss.clients) {
-    if (client.readyState === 1) client.send(msg);
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Meta de seguidores</title>
+<style>
+  :root { 
+    --c1: #ff2d78; /* Color principal (rosa TikTok) */
+    --c2: #00e5ff; /* Color secundario (azul TikTok) */
+    --bg: rgba(15, 15, 25, 0.85);
   }
-}
+  html, body {
+    margin: 0;
+    background: transparent;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #fff;
+    overflow: hidden;
+  }
+  /* Animación de flotación suave para toda la tarjeta */
+  .card {
+    position: relative;
+    width: 640px;
+    margin: 20px;
+    padding: 18px 24px 20px;
+    border-radius: 24px;
+    background: var(--bg);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    animation: float 6s ease-in-out infinite;
+  }
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0px); }
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  /* Tu nombre destacado */
+  .title { 
+    font-size: 24px; 
+    font-weight: 800; 
+    letter-spacing: 0.5px; 
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--c1), var(--c2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .count { font-size: 36px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+  .count small { font-size: 22px; opacity: 0.8; font-weight: 600; }
+  .bar {
+    height: 28px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .fill {
+    position: relative;
+    height: 100%;
+    width: 0;
+    border-radius: 14px;
+    background: linear-gradient(90deg, var(--c1), var(--c2));
+    box-shadow: 0 0 15px var(--c1);
+    transition: width 1s cubic-bezier(0.2, 0.9, 0.2, 1);
+    overflow: hidden;
+  }
+  .fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.6) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: shine 2s infinite;
+  }
+  @keyframes shine { to { transform: translateX(100%); } }
+  
+  /* Animación al ganar un seguidor */
+  .pop { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+  @keyframes pop { 
+    0% { transform: scale(1); } 
+    50% { transform: scale(1.3); color: var(--c2); } 
+    100% { transform: scale(1); } 
+  }
+  
+  /* Animación al llegar a la meta */
+  .goal-reached { animation: pulseGoal 1s ease-out; }
+  @keyframes pulseGoal {
+    0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.7); }
+    70% { box-shadow: 0 0 0 30px rgba(0, 229, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); }
+  }
 
-function setStatus(s) {
-  if (status === s) return;
-  status = s;
-  console.log('Estado:', s);
-  broadcast({ type: 'status', status: s });
-}
+  .toast {
+    height: 24px;
+    margin-top: 12px;
+    font-size: 17px;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.4s ease;
+    color: #e0e0e0;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  #dot {
+    display: none;
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #888;
+    box-shadow: 0 0 8px #888;
+  }
+  #dot.on { background: #2ee66b; box-shadow: 0 0 12px #2ee66b; }
+  #dot.warn { background: #ffb02e; box-shadow: 0 0 12px #ffb02e; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div id="dot"></div>
+  <div class="top">
+    <div class="title" id="title">🎮 JaadeenV</div>
+    <div class="count"><span id="num">0</span> <small>/ <span id="goal">0</span></small></div>
+  </div>
+  <div class="bar"><div class="fill" id="fill"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
 
-wss.on('connection', (ws) => {
-  ws.send(JSON.stringify({ type: 'status', status }));
-  ws.on('message', (raw) => {
-    // El overlay envía "ping" cada poco: mantiene despierto el servicio gratuito
-    if (String(raw) === 'ping') ws.send('pong');
-  });
-});
+<script>
+  // ---- Configuración ----
+  const p = new URLSearchParams(location.search);
+  // Paso de la meta (por defecto cada 50 seguidores: 50, 100, 150...)
+  const paso = parseInt(p.get('paso') || '50', 10); 
+  // Forzar un total inicial desde la URL si es necesario
+  const inicioURL = p.get('total'); 
 
-// ---------- Conexión con TikTok ----------
-let conn = null;
-let retryTimer = null;
+  const el = {
+    card: document.getElementById('card'),
+    num: document.getElementById('num'),
+    goal: document.getElementById('goal'),
+    fill: document.getElementById('fill'),
+    toast: document.getElementById('toast'),
+    dot: document.getElementById('dot'),
+  };
 
-function scheduleRetry() {
-  if (retryTimer) return;
-  retryTimer = setTimeout(() => {
-    retryTimer = null;
-    start();
-  }, RETRY_MS);
-}
+  // ---- Sistema de guardado del total real ----
+  let totalSeguidores = 0;
+  
+  // Si pones ?total=120 en la URL, fuerza ese número. Si no, lee el guardado.
+  if (inicioURL !== null && !isNaN(parseInt(inicioURL, 10))) {
+    totalSeguidores = parseInt(inicioURL, 10);
+    localStorage.setItem('jaadeen_total', totalSeguidores);
+  } else {
+    const saved = localStorage.getItem('jaadeen_total');
+    if (saved !== null) totalSeguidores = parseInt(saved, 10);
+  }
 
-async function start() {
-  try {
-    if (conn) {
-      try { conn.disconnect(); } catch (_) {}
+  // Calcula automáticamente la siguiente meta
+  function calcularSiguienteMeta(actual, salto) {
+    if (actual === 0) return salto;
+    const resto = actual % salto;
+    if (resto === 0) return actual + salto; // Si estás justo en 100, la meta es 150
+    return actual + (salto - resto);
+  }
+
+  function render(animateFollow, animateGoal) {
+    const meta = calcularSiguienteMeta(totalSeguidores, paso);
+    const metaAnterior = meta - paso;
+    
+    // Progreso dentro de la meta actual (ej: de 100 a 150)
+    const progreso = totalSeguidores - metaAnterior;
+    let porcentaje = (progreso / paso) * 100;
+    if (porcentaje > 100) porcentaje = 100;
+
+    el.num.textContent = totalSeguidores;
+    el.goal.textContent = meta;
+    el.fill.style.width = porcentaje + '%';
+
+    if (animateFollow) {
+      el.num.classList.remove('pop');
+      void el.num.offsetWidth; // Refresca la animación
+      el.num.classList.add('pop');
     }
-    conn = new Connection(TIKTOK_USER);
 
-    conn.on('follow', (data) => {
-      const id =
-        data.userId ||
-        (data.user && data.user.userId) ||
-        data.uniqueId ||
-        (data.user && data.user.uniqueId);
-      if (id && seen.has(id)) return;
-      if (id) seen.add(id);
-      const name = data.uniqueId || (data.user && data.user.uniqueId) || data.nickname || '';
-      console.log('Nuevo seguidor:', name);
-      broadcast({ type: 'follow', user: name });
-    });
-
-    conn.on('streamEnd', () => {
-      setStatus('offline');
-      scheduleRetry();
-    });
-
-    conn.on('disconnected', () => {
-      setStatus('offline');
-      scheduleRetry();
-    });
-
-    conn.on('error', (err) => {
-      console.log('Error de conexión:', err && err.message ? err.message : err);
-    });
-
-    await conn.connect();
-    setStatus('live');
-  } catch (err) {
-    console.log('No se pudo conectar (¿no estás en directo todavía?):', err && err.message ? err.message : err);
-    setStatus('offline');
-    scheduleRetry();
+    if (animateGoal) {
+      el.card.classList.remove('goal-reached');
+      void el.card.offsetWidth;
+      el.card.classList.add('goal-reached');
+      showToast('🎉 ¡META ALCANZADA! 🎉');
+    }
   }
-}
 
-process.on('uncaughtException', (e) => console.log('Excepción:', e && e.message ? e.message : e));
-process.on('unhandledRejection', (e) => console.log('Promesa rechazada:', e && e.message ? e.message : e));
+  let toastTimer = null;
+  function showToast(text) {
+    el.toast.textContent = text;
+    el.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.remove('show'), 4000);
+  }
 
-server.listen(PORT, () => {
-  console.log('Servidor en el puerto', PORT, '- usuario:', TIKTOK_USER);
-  start();
-});
+  function onFollow(user) {
+    const metaAntes = calcularSiguienteMeta(totalSeguidores, paso);
+    
+    totalSeguidores += 1;
+    localStorage.setItem('jaadeen_total', String(totalSeguidores)); 
+    
+    const metaDespues = calcularSiguienteMeta(totalSeguidores, paso);
+    const alcanzoMeta = (metaDespues > metaAntes); // Si la meta subió, es que la completamos
+
+    render(true, alcanzoMeta);
+    if (!alcanzoMeta) {
+        showToast('💖 ' + (user ? '@' + user + ' ' : '') + 'te ha seguido');
+    }
+  }
+
+  // ---- Conexión con tu servidor (Render) ----
+  let ws = null;
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    ws = new WebSocket(proto + location.host + '/ws');
+    ws.onopen = () => el.dot.className = 'warn';
+    ws.onmessage = (e) => {
+      let m;
+      try { m = JSON.parse(e.data); } catch (_) { return; }
+      if (m.type === 'follow') onFollow(m.user);
+      if (m.type === 'status') el.dot.className = m.status === 'live' ? 'on' : 'warn';
+    };
+    ws.onclose = () => { el.dot.className = ''; setTimeout(connect, 3000); };
+    ws.onerror = () => { try { ws.close(); } catch (_) {} };
+  }
+  
+  setInterval(() => { if (ws && ws.readyState === 1) ws.send('ping'); }, 45000);
+
+  render(false, false);
+  connect();
+</script>
+</body>
+</html>
